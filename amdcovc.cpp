@@ -37,6 +37,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #ifdef HAVE_ADLSDK
 #include <CL/cl.h>
 #endif
@@ -1217,7 +1218,7 @@ static void printAdaptersInfo(AMDGPUAdapterHandle& handle,
         { i++; continue; }
         const AMDGPUAdapterInfo adapterInfo = handle.parseAdapterInfo(ai);
         
-        std::cout << "Adapter " << i << ": PCI " <<
+        std::cout << "Adapter: " << i << ",PCI: " <<
                 adapterInfo.busNo << ":" << adapterInfo.deviceNo << ":" <<
                 adapterInfo.funcNo << ": " << adapterInfo.name << "\n"
                 "  Core: " << adapterInfo.coreClock << " MHz, "
@@ -1253,6 +1254,73 @@ static void printAdaptersInfo(AMDGPUAdapterHandle& handle,
             ++choosenIter;
         i++;
     }
+}
+
+std::string format( const char * format, ...)
+{
+    char buf[1024];
+    va_list arglist;
+    va_start(arglist, format);
+    vsnprintf(buf, 1024, format, arglist);
+    va_end(arglist);
+    return std::string(buf);
+}
+
+static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
+            const std::vector<int>& choosenAdapters, bool useChoosen)
+{
+    int adaptersNum = handle.getAdaptersNum();
+    auto choosenIter = choosenAdapters.begin();
+    int i = 0;
+    std::cout << "{\"adapters\": [";
+    for (int ai = 0; ai < adaptersNum; ai++)
+    {
+        if (useChoosen && (choosenIter==choosenAdapters.end() || *choosenIter!=i))
+        { i++; continue; }
+        std::cout << "{";
+        const AMDGPUAdapterInfo adapterInfo = handle.parseAdapterInfo(ai);
+        std::cout << format("\"adapter\": %d,", i)
+          << format("\" pci\": \"%04x:%02x:%02x.%x\",", 0, adapterInfo.busNo, adapterInfo.deviceNo, adapterInfo.funcNo)
+          << format("\" name\": \"%s\",", adapterInfo.name.c_str())
+          << format("\" core\": %d,", adapterInfo.coreClock)
+          << format("\" mem\": %d,", adapterInfo.memoryClock)
+          << format("\" perf\": \"%s\",", perfControlNames[int(adapterInfo.perfControl)])
+
+          << format("\" temp\": %d,", adapterInfo.temperature/1000.0)
+          << format("\" load\": %f,", adapterInfo.gpuLoad)
+          << format("\" vendor_id\": \"%4x:%4x\",", adapterInfo.vendorId, adapterInfo.deviceId);
+
+          if (adapterInfo.maxFanSpeed-adapterInfo.minFanSpeed <= 0)
+            std::cout << format("\" fan\": 0.0");
+          else
+            std::cout << format("\" fan\": %f", double(adapterInfo.fanSpeed-adapterInfo.minFanSpeed)/
+                double(adapterInfo.maxFanSpeed-adapterInfo.minFanSpeed)*100.0);
+        
+        // if ((adapterInfo.extraTemperatures&1) != 0)
+        //     std::cout << format("\"T2\": %f,", adapterInfo.temperature2/1000.0);
+        // if ((adapterInfo.extraTemperatures&2) != 0)
+        //     std::cout << format("\"T3\": %f,", adapterInfo.temperature3/1000.0);
+        
+        // if (!adapterInfo.coreClocks.empty())
+        // {
+        //     std::cout << "  Core Clocks:";
+        //     for (uint32_t v: adapterInfo.coreClocks)
+        //         std::cout << " " << v;
+        //     std::cout << std::endl;
+        // }
+        // if (!adapterInfo.memoryClocks.empty())
+        // {
+        //     std::cout << "  Memory Clocks:";
+        //     for (uint32_t v: adapterInfo.memoryClocks)
+        //         std::cout << " " << v;
+        //     std::cout << std::endl;
+        // }
+        if (useChoosen)
+            ++choosenIter;
+        i++;
+        std::cout << "},";
+    }
+    std::cout << "]}";
 }
 
 static void printAdaptersInfoVerbose(AMDGPUAdapterHandle& handle,
@@ -1385,6 +1453,7 @@ static void printAdaptersInfo(ADLMainControl& mainControl, int adaptersNum,
         i++;
     }
 }
+
 
 static void printAdaptersInfoVerbose(ADLMainControl& mainControl, int adaptersNum,
             const std::vector<int>& activeAdapters,
@@ -2609,7 +2678,7 @@ try
                 printAdaptersInfoVerbose(handle, choosenAdapters,
                             useAdaptersList && !chooseAllAdapters);
             else
-                printAdaptersInfo(handle, choosenAdapters,
+                printAdaptersInfoJson(handle, choosenAdapters,
                             useAdaptersList && !chooseAllAdapters);
         }
     }
