@@ -43,7 +43,10 @@
 #endif
 extern "C" {
 #include <pci/pci.h>
+#include "amdmeminfo.hpp"
 }
+
+
 
 #ifdef __linux__
 #define LINUX 1
@@ -760,6 +763,7 @@ try
     char* p2;
     errno = 0;
     value = strtoul(p, &p2, 0);
+
     if (errno != 0)
         throw Error("Can't parse value from file");
     return (p != p2);
@@ -1267,60 +1271,78 @@ std::string format( const char * format, ...)
 }
 
 static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
-            const std::vector<int>& choosenAdapters, bool useChoosen)
+            const std::vector<int>& choosenAdapters, bool useChoosen, bool withAmdmemInfo)
 {
     int adaptersNum = handle.getAdaptersNum();
     auto choosenIter = choosenAdapters.begin();
+    gpu_t *_device_list = NULL;
+    if (withAmdmemInfo){
+
+        _device_list = amdmeminfo();
+    }
     int i = 0;
     std::cout << "{\"adapters\": [";
     for (int ai = 0; ai < adaptersNum; ai++)
     {
         if (useChoosen && (choosenIter==choosenAdapters.end() || *choosenIter!=i))
         { i++; continue; }
-        std::cout << "{";
-        const AMDGPUAdapterInfo adapterInfo = handle.parseAdapterInfo(ai);
-        std::cout << format("\"adapter\": %d,", i)
-          << format("\" pci\": \"%04x:%02x:%02x.%x\",", 0, adapterInfo.busNo, adapterInfo.deviceNo, adapterInfo.funcNo)
-          << format("\" name\": \"%s\",", adapterInfo.name.c_str())
-          << format("\" core\": %d,", adapterInfo.coreClock)
-          << format("\" mem\": %d,", adapterInfo.memoryClock)
-          << format("\" perf\": \"%s\",", perfControlNames[int(adapterInfo.perfControl)])
 
-          << format("\" temp\": %d,", adapterInfo.temperature/1000.0)
-          << format("\" load\": %f,", adapterInfo.gpuLoad)
-          << format("\" vendor_id\": \"%4x:%4x\",", adapterInfo.vendorId, adapterInfo.deviceId);
+        const AMDGPUAdapterInfo adapterInfo = handle.parseAdapterInfo(ai);
+
+        std::string pciid = format("%04x:%02x:%02x.%x", 0, adapterInfo.busNo, adapterInfo.deviceNo, adapterInfo.funcNo);
+        
+        if (_device_list){
+            gpu_t *gpu = find_device((u8)adapterInfo.busNo, (u8)adapterInfo.deviceNo, (u8)adapterInfo.funcNo);
+            if(gpu){
+                 if (gpu->gpu==NULL) continue;
+
+                std::cout << format("{\"chip_type\": \"%s\",", amd_asic_name[gpu->gpu->asic_type])
+                          << format("\"opencl_platform\": %d,", gpu->opencl_platform)
+                          << format("\"opencl_id\": %d,", gpu->opencl_id)
+                          << format("\"memory_type\": \"%s\",", mem_type_label[gpu->mem->type])
+                          << format("\"bios_version\": \"%s\",", gpu->bios_version)
+                          << format("\"gpu_name\": \"%s\",", gpu->gpu->name)
+                          << format("\"is_apu\": %d,", gpu->is_apu);
+                          
+                          if (gpu->mem && gpu->mem->manufacturer != 0) {
+                              std::cout << format("\"memory_model\": \"%s\",", gpu->mem->name);
+                          }
+            }
+        }else{
+            std::cout << "{";
+        }
+
+        std::cout << format("\"adapter\": %d,", i)
+          << format("\"pci\": \"%s\",", pciid.c_str())
+          << format("\"name\": \"%s\",", adapterInfo.name.c_str())
+          << format("\"core\": %d,", adapterInfo.coreClock)
+          << format("\"mem\": %d,", adapterInfo.memoryClock)
+          << format("\"perf\": \"%s\",", perfControlNames[int(adapterInfo.perfControl)])
+
+          << format("\"temp\": %d,", int(adapterInfo.temperature/1000.0))
+          << format("\"load\": %d,", adapterInfo.gpuLoad)
+          << format("\"vendor_id\": \"%4x:%4x\",", adapterInfo.vendorId, adapterInfo.deviceId);
 
           if (adapterInfo.maxFanSpeed-adapterInfo.minFanSpeed <= 0)
-            std::cout << format("\" fan\": 0.0");
+            std::cout << format("\"fan\": 0");
           else
-            std::cout << format("\" fan\": %f", double(adapterInfo.fanSpeed-adapterInfo.minFanSpeed)/
-                double(adapterInfo.maxFanSpeed-adapterInfo.minFanSpeed)*100.0);
+            std::cout << format("\"fan\": %d", int(double(adapterInfo.fanSpeed-adapterInfo.minFanSpeed)/
+                double(adapterInfo.maxFanSpeed-adapterInfo.minFanSpeed)*100.0));
         
-        // if ((adapterInfo.extraTemperatures&1) != 0)
-        //     std::cout << format("\"T2\": %f,", adapterInfo.temperature2/1000.0);
-        // if ((adapterInfo.extraTemperatures&2) != 0)
-        //     std::cout << format("\"T3\": %f,", adapterInfo.temperature3/1000.0);
-        
-        // if (!adapterInfo.coreClocks.empty())
-        // {
-        //     std::cout << "  Core Clocks:";
-        //     for (uint32_t v: adapterInfo.coreClocks)
-        //         std::cout << " " << v;
-        //     std::cout << std::endl;
-        // }
-        // if (!adapterInfo.memoryClocks.empty())
-        // {
-        //     std::cout << "  Memory Clocks:";
-        //     for (uint32_t v: adapterInfo.memoryClocks)
-        //         std::cout << " " << v;
-        //     std::cout << std::endl;
-        // }
         if (useChoosen)
             ++choosenIter;
         i++;
-        std::cout << "},";
+        if (ai + 1 == adaptersNum){
+            std::cout << "}";
+        }else{
+            std::cout << "},";
+        }
     }
     std::cout << "]}";
+
+    if ((withAmdmemInfo==true) && (_device_list!=NULL)){
+        free_devices();
+    }
 }
 
 static void printAdaptersInfoVerbose(AMDGPUAdapterHandle& handle,
@@ -2553,6 +2575,7 @@ static const char* helpAndUsageString =
 "If no X11 server is running, then this program requires root privileges.\n";
 
 int main(int argc, const char** argv)
+
 try
 {
     bool printHelp = false;
@@ -2561,6 +2584,7 @@ try
     std::vector<int> choosenAdapters;
     bool useAdaptersList = false;
     bool chooseAllAdapters = false;
+    bool withAmdmemInfo = false;
     
     bool failed = false;
     for (int i = 1; i < argc; i++)
@@ -2600,6 +2624,10 @@ try
             "Program is distributed under terms of the GPLv2.\n"
             "Program available at https://github.com/matszpk/amdcovc.\n"<< std::endl;
             return 0;
+        }
+        else if (::strcmp(argv[i], "--meminfo")==0)
+        {
+            withAmdmemInfo = true;
         }
         else
         {
@@ -2679,7 +2707,7 @@ try
                             useAdaptersList && !chooseAllAdapters);
             else
                 printAdaptersInfoJson(handle, choosenAdapters,
-                            useAdaptersList && !chooseAllAdapters);
+                            useAdaptersList && !chooseAllAdapters, withAmdmemInfo);
         }
     }
     if (pciAccess!=nullptr)
