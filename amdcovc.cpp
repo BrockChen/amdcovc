@@ -1299,7 +1299,6 @@ static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
                 std::cout << format("{\"chip_type\": \"%s\",", amd_asic_name[gpu->gpu->asic_type])
                           << format("\"opencl_platform\": %d,", gpu->opencl_platform)
                           << format("\"opencl_id\": %d,", gpu->opencl_id)
-                          << format("\"memory_type\": \"%s\",", mem_type_label[gpu->mem->type])
                           << format("\"bios_version\": \"%s\",", gpu->bios_version)
                           << format("\"gpu_name\": \"%s\",", gpu->gpu->name)
                           << format("\"is_apu\": %d,", gpu->is_apu);
@@ -1307,6 +1306,8 @@ static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
                           if (gpu->mem && gpu->mem->manufacturer != 0) {
                               std::cout << format("\"memory_model\": \"%s\",", gpu->mem->name);
                           }
+                          if (gpu->mem)
+                              std::cout << format("\"memory_type\": \"%s\",", mem_type_label[gpu->mem->type]);
             }
         }else{
             std::cout << "{";

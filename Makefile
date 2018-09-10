@@ -20,7 +20,7 @@ LIBDIRS = -L/opt/amdgpu-pro/lib64
 #LIBDIRS =
 LIBS = -ldl -lpci -lm -lOpenCL -pthread
 else
-LIBS = -ldl -lpci -lm -pthread
+LIBS = -ldl -lpci -lm -pthread -lOpenCL
 LIBDIRS = 
 INCDIRS = 
 DEFINES =
