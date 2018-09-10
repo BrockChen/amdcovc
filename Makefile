@@ -5,9 +5,9 @@
 
 # 1 - if you need AMD Catalyst support, 0 - if you won't
 HAVE_ADLSDK = 0
-CXX = g++
-CXXFLAGS = -Wall -O3 -std=c++11
-LDFLAGS = -Wall -O3 -std=c++11
+CXX = g++ -g
+CXXFLAGS = -Wall -O0 -std=c++11
+LDFLAGS = -Wall -O0 -std=c++11
 
 ifeq ($(HAVE_ADLSDK),1)
 ADLSDKDIR = /home/mat/docs/src/ADL_SDK9
