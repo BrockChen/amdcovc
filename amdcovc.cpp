@@ -602,6 +602,18 @@ struct AMDGPUAdapterInfo
     unsigned int tempCritical;
     unsigned int busLanes;
     unsigned int busSpeed;
+
+    unsigned int minCoreClock;//pp_od_clk_limits
+    unsigned int maxCoreClock;//pp_od_clk_limits
+    unsigned int minMemClock; //pp_od_clk_limits
+    unsigned int maxMemClock; //pp_od_clk_limits
+    unsigned int minMemVoltage;
+    unsigned int maxMemVoltage;
+    unsigned int memVoltage;
+    unsigned int powerLimit;  //pp_power_limit
+    unsigned int powerUsage;  //pp_power_usage
+
+
     int gpuLoad;
     unsigned int extraTemperatures;
 };
@@ -750,6 +762,92 @@ public:
     void getPerformanceClocks(int adapterIndex, unsigned int& coreClock,
                     unsigned int& memoryClock) const;
 };
+
+
+static bool getFileTable(const char* filename, const char*  field, std::vector< std::vector<unsigned int> > &reslut) 
+try
+{
+    std::ifstream ifs(filename);
+    ifs.exceptions(std::ios::failbit);
+    
+    bool found = false;
+    std::vector< std::vector<unsigned int> > levels;
+    while(ifs){
+            std::string line;
+            std::getline(ifs, line);
+            if (line.length()==0) continue;
+            int pos = line.find(field);
+            if (pos == line.npos && found==false){
+                continue;
+            }else if(pos != line.npos){
+                found=true; continue;
+            }
+            std::vector<unsigned int> level;
+            int b = -1;
+            for (int i=0;i<line.length();i++){
+                
+                if (std::isdigit(line[i])){
+                    if (b==-1) b=i;
+                }else{
+                    // std::cout<< line[i] << " " << b << i << std::endl;
+                    if (b>=0 && b < i){
+                        std::string dst = line.substr(b, i-b);
+                        char* p = (char*)dst.c_str();
+                        char* p2;
+                        errno = 0;
+                        unsigned int value = strtoul(p, &p2, 0);
+                        if (p != p2){
+                            level.push_back(value);
+                            // std::cout<< value << " ";
+                        }
+                    }
+                    b = -1;
+                }
+            }
+            if (0==level.size()) break;
+            // std::cout<<"\n";
+            levels.push_back(level);
+            reslut = levels;
+    }
+  
+    return 0;
+}
+catch(const std::exception& ex)
+{
+    return false;
+}
+
+
+static bool getFileContentValueViaPrefixAndSurffix(const char* filename, const char* prefix, const char* surfix, unsigned int& value)
+{
+    value = 0;
+    std::ifstream ifs(filename);
+    ifs.exceptions(std::ios::failbit);
+
+    std::string line;
+
+    while(ifs){
+            std::getline(ifs, line);
+            int pos = line.find(prefix);
+            if (pos == line.npos){
+                continue;
+            }
+            int spos = pos + strlen(prefix);
+            int epos = line.find(surfix);
+            if (epos == line.npos){
+                continue;
+            }
+            std::string dst = line.substr(spos, epos);
+
+            char* p = (char*)dst.c_str();
+            char* p2;
+            errno = 0;
+            value = strtoul(p, &p2, 0);
+            return (p != p2);
+    }
+  
+    return 0;
+}
 
 static bool getFileContentValue(const char* filename, unsigned int& value)
 try
@@ -1086,6 +1184,25 @@ AMDGPUAdapterInfo AMDGPUAdapterHandle::parseAdapterInfo(int index)
     if (getFileContentValue(dbuf, adapterInfo.temperature3))
         adapterInfo.extraTemperatures |= 2;
     
+    snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_power_usage",cardIndex);
+    getFileContentValue(dbuf, adapterInfo.powerUsage);
+
+    snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_power_limit",cardIndex);
+    getFileContentValue(dbuf, adapterInfo.powerLimit);
+
+    snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_od_clk_limits",cardIndex);
+    getFileContentValueViaPrefixAndSurffix(dbuf, "Mclk Limit: ", " Mhz", adapterInfo.maxMemClock);
+    getFileContentValueViaPrefixAndSurffix(dbuf, "Sclk Limit: ", " Mhz", adapterInfo.maxCoreClock);
+
+    snprintf(dbuf, 120, "/sys/class/drm/card%u/device/gpu_defaults",cardIndex);
+    std::vector< std::vector<unsigned int> > reslut;
+    getFileTable(dbuf, "Default Memory DPM Table", reslut);
+    adapterInfo.minCoreClock = 300;
+    adapterInfo.minMemClock = 300;
+    adapterInfo.minMemVoltage = reslut[0][2];
+    adapterInfo.maxMemVoltage = reslut[2][3];
+
+
     // parse GPU load
     snprintf(dbuf, 120, "/sys/kernel/debug/dri/%u/amdgpu_pm_info", cardIndex);
     {
@@ -1299,6 +1416,7 @@ static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
                 std::cout << format("{\"chip_type\": \"%s\",", amd_asic_name[gpu->gpu->asic_type])
                           << format("\"opencl_platform\": %d,", gpu->opencl_platform)
                           << format("\"opencl_id\": %d,", gpu->opencl_id)
+                          << format("\"memory_type\": \"%s\",", mem_type_label[gpu->mem->type])
                           << format("\"bios_version\": \"%s\",", gpu->bios_version)
                           << format("\"gpu_name\": \"%s\",", gpu->gpu->name)
                           << format("\"is_apu\": %d,", gpu->is_apu);
@@ -1306,8 +1424,6 @@ static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
                           if (gpu->mem && gpu->mem->manufacturer != 0) {
                               std::cout << format("\"memory_model\": \"%s\",", gpu->mem->name);
                           }
-                          if (gpu->mem)
-                              std::cout << format("\"memory_type\": \"%s\",", mem_type_label[gpu->mem->type]);
             }
         }else{
             std::cout << "{";
@@ -1316,18 +1432,27 @@ static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
         std::cout << format("\"adapter\": %d,", i)
           << format("\"pci\": \"%s\",", pciid.c_str())
           << format("\"name\": \"%s\",", adapterInfo.name.c_str())
-          << format("\"core\": %d,", adapterInfo.coreClock)
-          << format("\"mem\": %d,", adapterInfo.memoryClock)
           << format("\"perf\": \"%s\",", perfControlNames[int(adapterInfo.perfControl)])
-
-          << format("\"temp\": %d,", int(adapterInfo.temperature/1000.0))
           << format("\"load\": %d,", adapterInfo.gpuLoad)
+
+          << format("\"core_clock\": %d,", adapterInfo.coreClock)
+          << format("\"mem_clock\": %d,", adapterInfo.memoryClock)
+          << format("\"temperature\": %d,", int(adapterInfo.temperature/1000.0))
+          << format("\"max_core_clock\": %d,", adapterInfo.maxCoreClock)
+          << format("\"min_core_clock\": %d,", adapterInfo.minCoreClock)
+          << format("\"max_mem_clock\": %d,", adapterInfo.maxMemClock)
+          << format("\"min_mem_clock\": %d,", adapterInfo.minMemClock)
+          << format("\"max_mem_voltage\": %d,", adapterInfo.maxMemVoltage)
+          << format("\"min_mem_voltage\": %d,", adapterInfo.minMemVoltage)
+          << format("\"power_limit\": %d,", adapterInfo.powerLimit)
+          << format("\"power_usage\": %d,", adapterInfo.powerUsage)
+
           << format("\"vendor_id\": \"%4x:%4x\",", adapterInfo.vendorId, adapterInfo.deviceId);
 
           if (adapterInfo.maxFanSpeed-adapterInfo.minFanSpeed <= 0)
-            std::cout << format("\"fan\": 0");
+            std::cout << format("\"fan_percent\": 0");
           else
-            std::cout << format("\"fan\": %d", int(double(adapterInfo.fanSpeed-adapterInfo.minFanSpeed)/
+            std::cout << format("\"fan_percent\": %d", int(double(adapterInfo.fanSpeed-adapterInfo.minFanSpeed)/
                 double(adapterInfo.maxFanSpeed-adapterInfo.minFanSpeed)*100.0));
         
         if (useChoosen)
@@ -2722,3 +2847,4 @@ catch(const std::exception& ex)
     std::cerr << ex.what() << std::endl;
     return 1;
 }
+
