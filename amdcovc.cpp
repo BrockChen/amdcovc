@@ -1201,7 +1201,7 @@ AMDGPUAdapterInfo AMDGPUAdapterHandle::parseAdapterInfo(int index)
     adapterInfo.minMemClock = 300;
     adapterInfo.minMemVoltage = reslut[0][2];
     adapterInfo.maxMemVoltage = reslut[2][3];
-
+    
     snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_od_clk_voltage", cardIndex);
     std::vector< std::vector<unsigned int> > reslut2;
     getFileTable(dbuf, "OD_MCLK", reslut2);
@@ -2852,3 +2852,4 @@ catch(const std::exception& ex)
     std::cerr << ex.what() << std::endl;
     return 1;
 }
+

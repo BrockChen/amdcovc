@@ -5,9 +5,9 @@
 
 # 1 - if you need AMD Catalyst support, 0 - if you won't
 HAVE_ADLSDK = 0
-CXX = g++
-CXXFLAGS = -Wall -O3 -std=c++11
-LDFLAGS = -Wall -O3 -std=c++11
+CXX = g++ -g
+CXXFLAGS = -Wall -O0 -std=c++11
+LDFLAGS = -Wall -O0 -std=c++11
 
 ifeq ($(HAVE_ADLSDK),1)
 ADLSDKDIR = /home/mat/docs/src/ADL_SDK9
@@ -20,7 +20,7 @@ LIBDIRS = -L/opt/amdgpu-pro/lib64
 #LIBDIRS =
 LIBS = -ldl -lpci -lm -lOpenCL -pthread
 else
-LIBS = -ldl -lpci -lm -pthread
+LIBS = -ldl -lpci -lm -pthread -lOpenCL
 LIBDIRS = 
 INCDIRS = 
 DEFINES =
