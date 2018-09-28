@@ -55,7 +55,7 @@ extern "C" {
 #include <adl_sdk.h>
 #endif
 
-#define AMDCOVC_VERSION "0.3.9.2"
+#define AMDCOVC_VERSION "3.4"
 
 #ifdef HAVE_ADLSDK
 // Memory allocation function
@@ -612,6 +612,8 @@ struct AMDGPUAdapterInfo
     unsigned int memVoltage;
     unsigned int powerLimit;  //pp_power_limit
     unsigned int powerUsage;  //pp_power_usage
+    unsigned int memLevel;  //pp_power_usage
+    unsigned int coreLevel;  //pp_power_usage
 
 
     int gpuLoad;
@@ -1190,23 +1192,35 @@ AMDGPUAdapterInfo AMDGPUAdapterHandle::parseAdapterInfo(int index)
     snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_power_limit",cardIndex);
     getFileContentValue(dbuf, adapterInfo.powerLimit);
 
-    snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_od_clk_limits",cardIndex);
-    getFileContentValueViaPrefixAndSurffix(dbuf, "Mclk Limit: ", " Mhz", adapterInfo.maxMemClock);
-    getFileContentValueViaPrefixAndSurffix(dbuf, "Sclk Limit: ", " Mhz", adapterInfo.maxCoreClock);
+    // snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_od_clk_limits",cardIndex);
+    // getFileContentValueViaPrefixAndSurffix(dbuf, "Mclk Limit: ", " Mhz", adapterInfo.maxMemClock);
+    // getFileContentValueViaPrefixAndSurffix(dbuf, "Sclk Limit: ", " Mhz", adapterInfo.maxCoreClock);
 
     snprintf(dbuf, 120, "/sys/class/drm/card%u/device/gpu_defaults",cardIndex);
     std::vector< std::vector<unsigned int> > reslut;
     getFileTable(dbuf, "Default Memory DPM Table", reslut);
     adapterInfo.minCoreClock = 300;
     adapterInfo.minMemClock = 300;
-    adapterInfo.minMemVoltage = reslut[0][2];
-    adapterInfo.maxMemVoltage = reslut[2][3];
-    
-    snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_od_clk_voltage", cardIndex);
-    std::vector< std::vector<unsigned int> > reslut2;
-    getFileTable(dbuf, "OD_MCLK", reslut2);
-    adapterInfo.memVoltage = reslut[2][2];
 
+    // adapterInfo.minMemVoltage = reslut[0][2];
+    adapterInfo.minMemVoltage = 800;
+    adapterInfo.maxMemVoltage = 1200;
+
+    adapterInfo.memLevel = reslut.size()-1;
+    adapterInfo.maxMemClock = reslut[adapterInfo.memLevel][1];
+
+    //todo:
+    //adapterInfo.maxMemVoltage = reslut[adapterInfo.memLevel-1][3];
+    
+
+    std::vector< std::vector<unsigned int> > reslut2;
+    getFileTable(dbuf, "Default Core DPM Table", reslut2);
+    adapterInfo.coreLevel = reslut2.size()-1;
+    adapterInfo.maxCoreClock = reslut2[adapterInfo.coreLevel][1];
+
+    snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_core_vddc", cardIndex);
+    getFileContentValue(dbuf, adapterInfo.memVoltage);
+    
     // parse GPU load
     snprintf(dbuf, 120, "/sys/kernel/debug/dri/%u/amdgpu_pm_info", cardIndex);
     {
@@ -1439,6 +1453,8 @@ static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
           << format("\"perf\": \"%s\",", perfControlNames[int(adapterInfo.perfControl)])
           << format("\"load\": %d,", adapterInfo.gpuLoad)
 
+          << format("\"mem_level\": %d,", adapterInfo.memLevel)
+          << format("\"core_level\": %d,", adapterInfo.coreLevel)
           << format("\"core_clock\": %d,", adapterInfo.coreClock)
           << format("\"mem_clock\": %d,", adapterInfo.memoryClock)
           << format("\"temperature\": %d,", int(adapterInfo.temperature/1000.0))
