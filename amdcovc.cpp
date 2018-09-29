@@ -1200,17 +1200,12 @@ AMDGPUAdapterInfo AMDGPUAdapterHandle::parseAdapterInfo(int index)
     std::vector< std::vector<unsigned int> > reslut;
     getFileTable(dbuf, "Default Memory DPM Table", reslut);
     adapterInfo.minCoreClock = 300;
-    adapterInfo.minMemClock = 300;
 
-    // adapterInfo.minMemVoltage = reslut[0][2];
-    adapterInfo.minMemVoltage = 800;
-    adapterInfo.maxMemVoltage = 1200;
-
+    adapterInfo.minMemVoltage = reslut[0][2];
     adapterInfo.memLevel = reslut.size()-1;
     adapterInfo.maxMemClock = reslut[adapterInfo.memLevel][1];
 
-    //todo:
-    //adapterInfo.maxMemVoltage = reslut[adapterInfo.memLevel-1][3];
+    adapterInfo.maxMemVoltage = reslut[adapterInfo.memLevel-1][3];
     
 
     std::vector< std::vector<unsigned int> > reslut2;
