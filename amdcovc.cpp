@@ -55,7 +55,7 @@ extern "C" {
 #include <adl_sdk.h>
 #endif
 
-#define AMDCOVC_VERSION "3.4"
+#define AMDCOVC_VERSION "3.6"
 
 #ifdef HAVE_ADLSDK
 // Memory allocation function
