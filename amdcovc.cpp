@@ -1205,7 +1205,7 @@ AMDGPUAdapterInfo AMDGPUAdapterHandle::parseAdapterInfo(int index)
     adapterInfo.memLevel = reslut.size()-1;
     adapterInfo.maxMemClock = reslut[adapterInfo.memLevel][1];
 
-    adapterInfo.maxMemVoltage = reslut[adapterInfo.memLevel-1][3];
+    adapterInfo.maxMemVoltage = reslut[adapterInfo.memLevel][3];
     
 
     std::vector< std::vector<unsigned int> > reslut2;
