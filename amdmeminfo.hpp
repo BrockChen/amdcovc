@@ -62,6 +62,7 @@ typedef enum AMD_CHIPS {
   CHIP_RAVEN,
 } asic_type_t;
 
+static const int mem_type_label_size = 7;
 static const char *mem_type_label[] = {
   "Unknown",
   "DDR1",

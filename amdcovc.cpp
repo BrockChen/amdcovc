@@ -765,22 +765,23 @@ public:
                     unsigned int& memoryClock) const;
 };
 
-
-static bool getFileTable(const char* filename, const char*  field, std::vector< std::vector<unsigned int> > &reslut) 
+int count = 0;
+static int getFileTable(const char* filename, const char*  field, std::vector< std::vector<unsigned int> > &reslut)
 try
 {
     std::ifstream ifs(filename);
     ifs.exceptions(std::ios::failbit);
     
     bool found = false;
+
     std::vector< std::vector<unsigned int> > levels;
     while(ifs){
             std::string line;
             std::getline(ifs, line);
-            if (line.length()==0) continue;
+            if (line.length()<=1) continue;
             int pos = line.find(field);
             if (pos == line.npos && found==false){
-                continue;
+               continue;
             }else if(pos != line.npos){
                 found=true; continue;
             }
@@ -808,15 +809,16 @@ try
             }
             if (0==level.size()) break;
             // std::cout<<"\n";
+            count += 1;
             levels.push_back(level);
             reslut = levels;
     }
   
-    return 0;
+    return count;
 }
 catch(const std::exception& ex)
 {
-    return false;
+    return count;
 }
 
 
@@ -1192,27 +1194,24 @@ AMDGPUAdapterInfo AMDGPUAdapterHandle::parseAdapterInfo(int index)
     snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_power_limit",cardIndex);
     getFileContentValue(dbuf, adapterInfo.powerLimit);
 
-    // snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_od_clk_limits",cardIndex);
-    // getFileContentValueViaPrefixAndSurffix(dbuf, "Mclk Limit: ", " Mhz", adapterInfo.maxMemClock);
-    // getFileContentValueViaPrefixAndSurffix(dbuf, "Sclk Limit: ", " Mhz", adapterInfo.maxCoreClock);
-
     snprintf(dbuf, 120, "/sys/class/drm/card%u/device/gpu_defaults",cardIndex);
     std::vector< std::vector<unsigned int> > reslut;
-    getFileTable(dbuf, "Default Memory DPM Table", reslut);
-    adapterInfo.minCoreClock = 300;
+    bool is_default_ok = getFileTable(dbuf, "Default Memory DPM Table", reslut);
 
-    adapterInfo.minMemVoltage = reslut[0][2];
-    adapterInfo.memLevel = reslut.size()-1;
-    adapterInfo.maxMemClock = reslut[adapterInfo.memLevel][1];
+    if (is_default_ok){
 
-    adapterInfo.maxMemVoltage = reslut[adapterInfo.memLevel][3];
-    
+        adapterInfo.minCoreClock = 300;
 
-    std::vector< std::vector<unsigned int> > reslut2;
-    getFileTable(dbuf, "Default Core DPM Table", reslut2);
-    adapterInfo.coreLevel = reslut2.size()-1;
-    adapterInfo.maxCoreClock = reslut2[adapterInfo.coreLevel][1];
+        adapterInfo.minMemVoltage = reslut[0][2];
+        adapterInfo.memLevel = reslut.size()-1;
+        adapterInfo.maxMemClock = reslut[adapterInfo.memLevel][1];
+        adapterInfo.maxMemVoltage = reslut[adapterInfo.memLevel][3];
 
+        std::vector< std::vector<unsigned int> > reslut2;
+        getFileTable(dbuf, "Default Core DPM Table", reslut2);
+        adapterInfo.coreLevel = reslut2.size()-1;
+        adapterInfo.maxCoreClock = reslut2[adapterInfo.coreLevel][1];
+     }
     snprintf(dbuf, 120, "/sys/class/drm/card%u/device/pp_core_vddc", cardIndex);
     getFileContentValue(dbuf, adapterInfo.memVoltage);
     
@@ -1429,13 +1428,16 @@ static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
                 std::cout << format("{\"chip_type\": \"%s\",", amd_asic_name[gpu->gpu->asic_type])
                           << format("\"opencl_platform\": %d,", gpu->opencl_platform)
                           << format("\"opencl_id\": %d,", gpu->opencl_id)
-                          << format("\"memory_type\": \"%s\",", mem_type_label[gpu->mem->type])
+
                           << format("\"bios_version\": \"%s\",", gpu->bios_version)
                           << format("\"gpu_name\": \"%s\",", gpu->gpu->name)
                           << format("\"is_apu\": %d,", gpu->is_apu);
                           
-                          if (gpu->mem && gpu->mem->manufacturer != 0) {
-                              std::cout << format("\"memory_model\": \"%s\",", gpu->mem->name);
+                          if (gpu->mem){
+                            if (gpu->mem->manufacturer != 0)
+                                std::cout << format("\"memory_model\": \"%s\",", gpu->mem->name);
+                            if (gpu->mem->type >= 0 && gpu->mem->type < mem_type_label_size)
+                                std::cout << format("\"memory_type\": \"%s\",", mem_type_label[gpu->mem->type]); 
                           }
             }
         }else{
