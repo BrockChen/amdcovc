@@ -55,7 +55,7 @@ extern "C" {
 #include <adl_sdk.h>
 #endif
 
-#define AMDCOVC_VERSION "3.9"
+#define AMDCOVC_VERSION "3.10"
 
 #ifdef HAVE_ADLSDK
 // Memory allocation function
@@ -1433,9 +1433,9 @@ static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
 
                           << format("\"bios_version\": \"%s\",", gpu->bios_version)
                           << format("\"gpu_name\": \"%s\",", gpu->gpu->name)
-                          << format("\"rev_id\": \"%x\",", gpu->pcirev)
-                          << format("\"subdevice\": \"%x\",", gpu->subdevice)
-                          << format("\"memsize\": \"%lu\",", dbytes)
+                          << format("\"rev_id\": %lu,", gpu->pcirev)
+                          << format("\"subdevice\": %lu,", gpu->subdevice)
+                          << format("\"memsize\": %lu,", dbytes)
                           << format("\"is_apu\": %d,", gpu->is_apu);
                           
                           if (gpu->mem){
