@@ -62,6 +62,7 @@ typedef enum AMD_CHIPS {
   CHIP_RAVEN,
 } asic_type_t;
 
+static const int mem_type_label_size = 7;
 static const char *mem_type_label[] = {
   "Unknown",
   "DDR1",
@@ -395,6 +396,7 @@ typedef struct gpu {
   u16 vendor_id, device_id;
   gputype_t *gpu;
   memtype_t *mem;
+  cl_ulong memsize;
   int memconfig, mem_type, mem_manufacturer, mem_model;
   u8 pcibus, pcidev, pcifunc, pcirev;
   int opencl_platform;
@@ -586,12 +588,15 @@ static int opencl_get_devices()
                 if (intval == 0x1002) {
                   cl_device_topology_amd amdtopo;
                   gpu_t *dev;
+		  cl_ulong memsize = 0;
+                  clGetDeviceInfo(devices[i], CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(memsize), &memsize, NULL);
 
                   if ((status = clGetDeviceInfo(devices[i], CL_DEVICE_TOPOLOGY_AMD, sizeof(amdtopo), &amdtopo, NULL)) == CL_SUCCESS) {
 
                     if ((dev = find_device((u8)amdtopo.pcie.bus, (u8)amdtopo.pcie.device, (u8)amdtopo.pcie.function)) != NULL) {
                       dev->opencl_platform = p;
                       dev->opencl_id = i;
+                      dev->memsize = memsize;
                     }
                   } else {
                     print(LOG_ERROR, "CL_DEVICE_TOPOLOGY_AMD Failed: Unable to map OpenCL device to PCI device.\n");
