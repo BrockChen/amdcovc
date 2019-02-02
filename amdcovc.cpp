@@ -1434,7 +1434,7 @@ static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
                           << format("\"bios_version\": \"%s\",", gpu->bios_version)
                           << format("\"gpu_name\": \"%s\",", gpu->gpu->name)
                           << format("\"rev_id\": %lu,", gpu->pcirev)
-                          << format("\"subdevice\": %lu,", gpu->subdevice)
+                          << format("\"subdevice\": \"0x%X%X\",", gpu->subdevice, gpu->subvendor)
                           << format("\"memsize\": %lu,", dbytes)
                           << format("\"is_apu\": %d,", gpu->is_apu);
                           
