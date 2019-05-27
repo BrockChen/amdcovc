@@ -23,6 +23,7 @@
 
 #define LOG_INFO 1
 #define LOG_ERROR 2
+#define MEM_UNKNOWN 0x0
 
 #define MEM_GDDR5 0x5
 #define MEM_HBM  0x6
@@ -346,10 +347,10 @@ static memtype_t memtypes[] = {
     { MEM_GDDR5, 0xf, -1, "Unknown Micron" },
     { MEM_GDDR5, 0xf, 0x1, "Micron MT51J256M32" },
     { MEM_GDDR5, 0xf, 0x0, "Micron MT51J256M3" },
-    { MEM_GDDR5, 0x0, -1, "Unknown GDDR5" },
 
     /* HBM */
     { MEM_HBM, 0x1, -1, "Unknown Samsung HBM" },
+    { MEM_HBM, 0x1, 0, "Samsung KHA843801B" },
     { MEM_HBM, 0x2, -1, "Unknown Infineon HBM" },
     { MEM_HBM, 0x3, -1, "Unknown Elpida HBM" },
     { MEM_HBM, 0x4, -1, "Unknown Etron HBM" },
@@ -360,7 +361,9 @@ static memtype_t memtypes[] = {
     { MEM_HBM, 0x8, -1, "Unknown Winbond HBM" },
     { MEM_HBM, 0x9, -1, "Unknown ESMT HBM" },
     { MEM_HBM, 0xf, -1, "Unknown Micron HBM" },
+    { MEM_GDDR5, 0x0, -1, "Unknown GDDR5" },
     { MEM_HBM, 0x0, -1, "Unknown HBM" },
+    { MEM_UNKNOWN, 0x0, -1, "Unknown Memory" },
 };
 
 
@@ -369,7 +372,7 @@ static memtype_t *find_mem(int mem_type, int manufacturer, int model)
 {
   memtype_t *m = memtypes; //, *last = NULL;
 
-  while (m->manufacturer)
+  while (m->type)
   {
     if (m->type == mem_type && m->manufacturer == manufacturer && m->model == model) {
       //last = m;
@@ -796,6 +799,15 @@ gpu_t *amdmeminfo()
         /*else {
           printf("%02x.%02x.%x: vbios dump failed.\n", d->pcibus, d->pcidev, d->pcifunc);
         }*/
+        //currenty Vega GPUs do not have a memory configuration register to read
+        if (d->gpu->asic_type == CHIP_VEGA10) {
+          d->memconfig = 0x61000000;
+          d->mem_type = MEM_HBM;
+          d->mem_manufacturer = 1;
+          d->mem_model = 0;
+          d->mem = find_mem(MEM_HBM, 1, 0);
+        }
+        else {
 
         for (i=6;--i;)
         {
@@ -836,7 +848,7 @@ gpu_t *amdmeminfo()
       }
     }
   }
-
+}
   pci_cleanup(pci);
 
   // get open cl device ids and link them to pci devices found
