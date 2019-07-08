@@ -209,6 +209,7 @@ static gputype_t gputypes[] = {
     { 0x1002, 0x7300, 0, 0xcb, "Radeon R9 Fury", CHIP_FIJI},
     /* RX 5xx */
     { 0x1002, 0x67df, 0, 0xe7, "Radeon RX 580", CHIP_POLARIS10},
+    { 0x1002, 0x6fdf, 0, 0xef, "Radeon RX 580", CHIP_POLARIS10},
     { 0x1002, 0x67df, 0, 0xef, "Radeon RX 570", CHIP_POLARIS10},
     { 0x1002, 0x67ff, 0, 0xcf, "Radeon RX 560", CHIP_POLARIS11},
     { 0x1002, 0x67ff, 0, 0xff, "Radeon RX 550", CHIP_POLARIS11},  /* new RX550 with 640 shaders */
@@ -790,7 +791,10 @@ gpu_t *amdmeminfo()
        // printf("* Vendor: %04x, Device: %04x, Revision: %02x\n", pcidev->vendor_id, pcidev->device_id, d->pcirev);
 
         d->gpu = find_gpu(pcidev->vendor_id, pcidev->device_id, d->subdevice, d->pcirev);
-        
+        if (d->gpu==NULL){
+          printf("gpu not found, vendor_id: %x, device_id: %x, subdevice: %x, pcirev: %x\n", pcidev->vendor_id, pcidev->device_id, d->subdevice, d->pcirev);
+          continue;
+        }
         if (dump_vbios(d)) {
           /*printf("%02x.%02x.%x: vbios dump successful.\n", d->pcibus, d->pcidev, d->pcifunc);
           printf("%x %x\n", d->vbios[0], d->vbios[1]);*/
@@ -868,3 +872,4 @@ gpu_t *amdmeminfo()
 
   return device_list;
 }
+
