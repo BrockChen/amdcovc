@@ -238,6 +238,7 @@ static gputype_t gputypes[] = {
     { 0x1002, 0x6811, 0, 0, "Radeon R9 270", CHIP_PITCAIRN},
     { 0x1002, 0x6810, 0, 0, "Radeon R9 270x/R7 370", CHIP_PITCAIRN},
     { 0x1002, 0x6658, 0, 0, "Radeon R7 260x", CHIP_BONAIRE},
+    { 0x1002, 0x66af, 0, 0xc1, "Radeon VII", CHIP_UNKNOWN},
     /* HD 7xxx */
     { 0x1002, 0x679b, 0, 0, "Radeon HD7990", CHIP_TAHITI},
     { 0x1002, 0x6798, 0, 0, "Radeon HD7970/R9 280x", CHIP_TAHITI},

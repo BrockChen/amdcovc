@@ -1425,8 +1425,11 @@ static void printAdaptersInfoJson(AMDGPUAdapterHandle& handle,
             if(gpu){
                  if (gpu->gpu==NULL) continue;
                   u64 dbytes = gpu->memsize;
-  		  int dunit;
-                  for (dunit=0; dbytes >= 10240; dbytes>>=10,dunit++) ;
+  		          int dunit;
+                  for (dunit=0; dbytes >= 10240; dunit++) {
+                    if (dunit>=2)break;
+                    dbytes>>=10;
+                  }
                 std::cout << format("{\"chip_type\": \"%s\",", amd_asic_name[gpu->gpu->asic_type])
                           << format("\"opencl_platform\": %d,", gpu->opencl_platform)
                           << format("\"opencl_id\": %d,", gpu->opencl_id)
@@ -2870,5 +2873,6 @@ catch(const std::exception& ex)
     std::cerr << ex.what() << std::endl;
     return 1;
 }
+
 
 
